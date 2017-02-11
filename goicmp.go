@@ -11,16 +11,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
-)
-
-import (
 	_ "image/png"
 	"image/png"
 )
 
 var (
-	gHelp        bool    = true
-
 	gImage1 *image.RGBA64
 	gImage2 *image.RGBA64
 
@@ -58,22 +53,9 @@ func compare16(pic1 *image.RGBA64, pic2 *image.RGBA64, highlight highlight16_fun
 	stats.NumPixels = int64(pic1.Bounds().Dx()) * int64(pic1.Bounds().Dy())
 	result = image.NewRGBA64(pic1.Bounds())
 	for y := 0; y < pic1.Bounds().Dy(); y++ {
-		var src1 int = pic1.PixOffset(0, y)
-		var src2 int = pic2.PixOffset(0, y)
-		var dst int = result.PixOffset(0, y)
 		for x := 0; x < pic1.Bounds().Dx(); x++ {
-			var c1 color.RGBA64 = color.RGBA64{
-				uint16(pic1.Pix[src1+0])<<8 | uint16(pic1.Pix[src1+1]),
-				uint16(pic1.Pix[src1+2])<<8 | uint16(pic1.Pix[src1+3]),
-				uint16(pic1.Pix[src1+4])<<8 | uint16(pic1.Pix[src1+5]),
-				uint16(pic1.Pix[src1+6])<<8 | uint16(pic1.Pix[src1+7]),
-			}
-			var c2 color.RGBA64 = color.RGBA64{
-				uint16(pic2.Pix[src2+0])<<8 | uint16(pic2.Pix[src2+1]),
-				uint16(pic2.Pix[src2+2])<<8 | uint16(pic2.Pix[src2+3]),
-				uint16(pic2.Pix[src2+4])<<8 | uint16(pic2.Pix[src2+5]),
-				uint16(pic2.Pix[src2+6])<<8 | uint16(pic2.Pix[src2+7]),
-			}
+			var c1 color.RGBA64 = pic1.RGBA64At(x, y);
+			var c2 color.RGBA64 = pic2.RGBA64At(x, y);
 
 			same, r := highlight(c1, c2)
 
@@ -81,17 +63,7 @@ func compare16(pic1 *image.RGBA64, pic2 *image.RGBA64, highlight highlight16_fun
 				stats.ExactSame = false
 				stats.DiffPixels += 1
 			}
-			result.Pix[dst+0] = uint8(r.R >> 8)
-			result.Pix[dst+1] = uint8(r.R)
-			result.Pix[dst+2] = uint8(r.G >> 8)
-			result.Pix[dst+3] = uint8(r.G)
-			result.Pix[dst+4] = uint8(r.B >> 8)
-			result.Pix[dst+5] = uint8(r.B)
-			result.Pix[dst+6] = uint8(r.A >> 8)
-			result.Pix[dst+7] = uint8(r.A)
-			src1 += 8
-			src2 += 8
-			dst += 8
+			result.SetRGBA64(x, y, r);
 		}
 	}
 
@@ -112,6 +84,7 @@ func samePixel16(c1 color.RGBA64, c2 color.RGBA64) (same bool, delta uint16) {
 	same = c1.R == c2.R && c1.G == c2.G && c1.B == c2.B && c1.A == c2.A
 	if !same {
 		delta = uint16((delta16(c1.R, c2.R) + delta16(c1.G, c2.G) + delta16(c1.B, c2.B) + delta16(c1.A, c2.A)) / 4)
+		//fmt.Printf("delta: %d\n", delta)
 		if delta <= 255 {
 			same = true
 		}
@@ -120,13 +93,12 @@ func samePixel16(c1 color.RGBA64, c2 color.RGBA64) (same bool, delta uint16) {
 }
 
 func highlight_distance16(c1 color.RGBA64, c2 color.RGBA64) (same bool, r color.RGBA64) {
-	var delta uint16
-	same, delta = samePixel16(c1, c2)
+	same, _ = samePixel16(c1, c2)
 
 	if !same {
-		r.R = delta
-		r.G = delta
-		r.B = delta
+		r.R = 65535
+		r.G = 0
+		r.B = 0
 		r.A = 65535
 	} else {
 		r.R = 0
