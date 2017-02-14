@@ -12,7 +12,7 @@ import (
 	"os"
 	"strings"
 	_ "image/png"
-	"image/png"
+	"math"
 )
 
 var (
@@ -26,7 +26,6 @@ var gOpts struct {
 	// Slice of bool will append 'true' each time the option
 	// is encountered (can be set multiple times, like -vvv)
 	Verbose []bool `short:"v" long:"verbose" description:"Show verbose debug information"`
-	Output  string `short:"o" long:"output" description:"Output diff image" optional:"yes" optional-value:""`
 }
 
 type DiffStats struct {
@@ -46,67 +45,67 @@ func (p *DiffStats) Report() {
 	fmt.Printf("\tDifferent Pixels #: %d\n", p.DiffPixels)
 }
 
-type highlight16_func func(c1 color.RGBA64, c2 color.RGBA64) (same bool, r color.RGBA64)
-
-func compare16(pic1 *image.RGBA64, pic2 *image.RGBA64, highlight highlight16_func) (stats DiffStats, result *image.RGBA64, err error) {
+func compare16(pic1 *image.RGBA64, pic2 *image.RGBA64) (stats DiffStats, err error) {
 	stats.ExactSame = true
 	stats.NumPixels = int64(pic1.Bounds().Dx()) * int64(pic1.Bounds().Dy())
-	result = image.NewRGBA64(pic1.Bounds())
-	for y := 0; y < pic1.Bounds().Dy(); y++ {
-		for x := 0; x < pic1.Bounds().Dx(); x++ {
-			var c1 color.RGBA64 = pic1.RGBA64At(x, y);
-			var c2 color.RGBA64 = pic2.RGBA64At(x, y);
+	var KERNEL int = 3
+	var Threshold uint32 = 16
+	for y := 0; y < (pic1.Bounds().Dy() - KERNEL); y++ {
+		for x := 0; x < (pic1.Bounds().Dx() - KERNEL); x++ {
+			var r1, g1, b1, a1 uint32
+			r1, g1, b1, a1 = 0, 0, 0, 0
 
-			same, r := highlight(c1, c2)
+			for i := 0; i <= KERNEL; i++ {
+				for j := 0; j <= KERNEL; j++ {
+					var c color.RGBA64 = pic1.RGBA64At(x + i, y + i);
+					r0, g0, b0, a0 := c.RGBA()
+					r1 += r0
+					g1 += g0
+					b1 += b0
+					a1 += a0
+				}
+			}
+
+			r1 >>= 12
+			g1 >>= 12
+			b1 >>= 12
+			a1 >>= 12
+
+			var r2, g2, b2, a2 uint32
+			r2, g2, b2, a2 = 0, 0, 0, 0
+
+			for i := 0; i <= KERNEL; i++ {
+				for j := 0; j <= KERNEL; j++ {
+					var c color.RGBA64 = pic2.RGBA64At(x + i, y + i);
+					r0, g0, b0, a0 := c.RGBA()
+					r2 += r0
+					g2 += g0
+					b2 += b0
+					a2 += a0
+				}
+			}
+
+			r2 >>= 12
+			g2 >>= 12
+			b2 >>= 12
+			a2 >>= 12
+
+			var diff uint32 = uint32(math.Abs(float64(r1) - float64(r2)))
+			diff += uint32(math.Abs(float64(g1) - float64(g2)))
+			diff += uint32(math.Abs(float64(b1) - float64(b2)))
+			diff += uint32(math.Abs(float64(a1) - float64(a2)))
+
+			diff >>= 2
+			same := diff <= Threshold
 
 			if !same {
 				stats.ExactSame = false
 				stats.DiffPixels += 1
 			}
-			result.SetRGBA64(x, y, r);
 		}
 	}
 
-	return stats, result, nil
-}
-
-func delta16(x uint16, y uint16) uint {
-	if x < y {
-		return uint(y - x)
-	}
-	return uint(x - y)
-}
-
-func samePixel16(c1 color.RGBA64, c2 color.RGBA64) (same bool, delta uint16) {
-	if c1.A == 0 && c2.A == 0 {
-		return true, 0
-	}
-	same = c1.R == c2.R && c1.G == c2.G && c1.B == c2.B && c1.A == c2.A
-	if !same {
-		delta = uint16((delta16(c1.R, c2.R) + delta16(c1.G, c2.G) + delta16(c1.B, c2.B) + delta16(c1.A, c2.A)) / 4)
-		//fmt.Printf("delta: %d\n", delta)
-		if delta <= 255 {
-			same = true
-		}
-	}
-	return same, delta
-}
-
-func highlight_distance16(c1 color.RGBA64, c2 color.RGBA64) (same bool, r color.RGBA64) {
-	same, _ = samePixel16(c1, c2)
-
-	if !same {
-		r.R = 65535
-		r.G = 0
-		r.B = 0
-		r.A = 65535
-	} else {
-		r.R = 0
-		r.G = 0
-		r.B = 0
-		r.A = 0
-	}
-	return same, r
+	return stats, nil
 }
 
 func downloadImage(url string) (err error, path string) {
@@ -194,22 +193,8 @@ func main() {
 		}
 
 		var stats DiffStats
-		var result image.Image
-		if stats, result, err = compare16(gImage1, gImage2, highlight_distance16); err != nil {
+		if stats, err = compare16(gImage1, gImage2); err != nil {
 			panic(err.Error())
-		}
-
-		if len(gOpts.Output) > 0 {
-			var f *os.File
-			if f, err = os.OpenFile(gOpts.Output, os.O_CREATE|os.O_WRONLY, 0666); err != nil {
-				panic(err.Error())
-			}
-			if err = png.Encode(f, result); err != nil {
-				panic(err.Error())
-			}
-			if len(gOpts.Verbose) > 0 {
-				fmt.Printf("Output file created: %s\n", gOpts.Output)
-			}
 		}
 
 		if len(gOpts.Verbose) > 0 {
