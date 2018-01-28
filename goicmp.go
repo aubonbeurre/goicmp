@@ -5,7 +5,6 @@ import (
 	"image"
 	_ "image/png"
 	"os"
-	"strings"
 
 	"github.com/aubonbeurre/goicmp/utils"
 	"github.com/jessevdk/go-flags"
@@ -22,8 +21,8 @@ var gOpts struct {
 	// Slice of bool will append 'true' each time the option
 	// is encountered (can be set multiple times, like -vvv)
 	Verbose []bool `short:"v" long:"verbose" description:"Show verbose debug information"`
-	// Example of a value name
-	Batch string `short:"b" long:"batch" description:"A json file with a list of diff" value-name:"BATCHFILE"`
+	Batch   string `short:"b" long:"batch" description:"A json file with a list of diff" value-name:"BATCHFILE"`
+	Out     string `short:"o" long:"output" description:"A json output with the results" value-name:"OUTPUT"`
 }
 
 func main() {
@@ -35,9 +34,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	gOpts.Batch = "/Users/aparente/test.json"
 	if len(gOpts.Batch) > 0 {
 		var exitcode int
-		if exitcode, err = utils.RunDiffBatch(gOpts.Batch); err != nil {
+		if exitcode, err = utils.RunDiffBatch(gOpts.Batch, gOpts.Out); err != nil {
 			panic(err)
 		}
 		os.Exit(exitcode)
@@ -50,26 +50,15 @@ func main() {
 	gDiffFlag = len(args) == 2
 
 	var image1path = args[0]
-	if strings.HasPrefix(image1path, "http") {
-		if image1path, err = utils.DownloadImage(image1path); err != nil {
-			panic(err)
-		}
-	}
-
-	if gImage1, err = utils.NewImage(image1path); err != nil {
-		panic(err)
+	if gImage1, err = utils.DownloadOrLoadImage(image1path); err != nil {
+		panic(fmt.Errorf("Error reading '%s' (%v)", image1path, err))
 	}
 
 	if gDiffFlag {
 		var image2path = args[1]
-		if strings.HasPrefix(image2path, "http") {
-			if image2path, err = utils.DownloadImage(image2path); err != nil {
-				panic(err)
-			}
-		}
 
-		if gImage2, err = utils.NewImage(image2path); err != nil {
-			panic(err)
+		if gImage2, err = utils.DownloadOrLoadImage(image2path); err != nil {
+			panic(fmt.Errorf("Error reading '%s' (%v)", image2path, err))
 		}
 
 		if gImage1.Bounds().Size().X != gImage2.Bounds().Size().X || gImage1.Bounds().Size().Y != gImage2.Bounds().Size().Y {

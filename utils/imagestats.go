@@ -8,13 +8,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // DiffStats ...
 type DiffStats struct {
-	NumPixels  int64
-	DiffPixels int64
-	ExactSame  bool
+	NumPixels  int64 `json:"numpixels"`
+	DiffPixels int64 `json:"diffpixels"`
+	ExactSame  bool  `json:"exactsame"`
 }
 
 // Report ...
@@ -67,4 +68,19 @@ func NewImage(file string) (rgba *image.RGBA64, err error) {
 	draw.Draw(rgba, rgba.Bounds(), img, image.Point{0, 0}, draw.Src)
 
 	return rgba, nil
+}
+
+// DownloadOrLoadImage ...
+func DownloadOrLoadImage(image1path string) (rgba *image.RGBA64, err error) {
+
+	if strings.HasPrefix(image1path, "http") {
+		if image1path, err = DownloadImage(image1path); err != nil {
+			return nil, fmt.Errorf("Error reading '%s' (%v)", image1path, err)
+		}
+	}
+
+	if rgba, err = NewImage(image1path); err != nil {
+		return nil, fmt.Errorf("Error reading '%s' (%v)", image1path, err)
+	}
+	return rgba, err
 }
