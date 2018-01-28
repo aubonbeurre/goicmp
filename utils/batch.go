@@ -18,8 +18,6 @@ type DiffBatch struct {
 type DiffImage struct {
 	Image     string   `json:"img"`
 	Baselines []string `json:"baselines"`
-	AEP       string   `json:"aep"`
-	CompInfo  string   `json:"compinfo"`
 	TC        string   `json:"tc"`
 	UUID      string   `json:"uuid"`
 }

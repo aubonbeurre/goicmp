@@ -34,7 +34,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	gOpts.Batch = "/Users/aparente/test.json"
 	if len(gOpts.Batch) > 0 {
 		var exitcode int
 		if exitcode, err = utils.RunDiffBatch(gOpts.Batch, gOpts.Out); err != nil {
